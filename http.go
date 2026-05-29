@@ -67,8 +67,25 @@ func (h *HTTPServer) handleIncrement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// --- BEGIN your code ---
-	_ = time.Second
-	http.Error(w, "TODO: implement /increment", http.StatusNotImplemented)
+	if h.raft.State() != raft.Leader {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error":  "not leader",
+			"leader": string(h.raft.Leader()),
+		})
+		return
+	}
+	cmd := EncodeIncrement()
+	future := h.raft.Apply(cmd, 5*time.Second)
+	if err := future.Error(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	resp := future.Response()
+	if err, ok := resp.(error); ok {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"value": resp})
 	// --- END your code ---
 }
 
@@ -81,7 +98,7 @@ func (h *HTTPServer) handleIncrement(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 func (h *HTTPServer) handleValue(w http.ResponseWriter, r *http.Request) {
 	// --- BEGIN your code ---
-	http.Error(w, "TODO: implement /value", http.StatusNotImplemented)
+	writeJSON(w, http.StatusOK, map[string]any{"value": h.fsm.Value()})
 	// --- END your code ---
 }
 

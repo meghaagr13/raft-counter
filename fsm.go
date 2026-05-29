@@ -100,7 +100,9 @@ func (f *CounterFSM) Apply(log *raft.Log) interface{} {
 // is being written.
 func (f *CounterFSM) Snapshot() (raft.FSMSnapshot, error) {
 	// --- BEGIN your code ---
-	return nil, errors.New("TODO: implement Snapshot")
+
+	val := atomic.LoadInt64(&f.value)
+	return &counterSnapshot{value: val}, nil
 	// --- END your code ---
 }
 
@@ -115,8 +117,17 @@ func (f *CounterFSM) Snapshot() (raft.FSMSnapshot, error) {
 // Hint: io.ReadFull(rc, buf) reads exactly 8 bytes or returns an error.
 func (f *CounterFSM) Restore(rc io.ReadCloser) error {
 	// --- BEGIN your code ---
-	_ = rc
-	return errors.New("TODO: implement Restore")
+
+	buf := make([]byte, 8)
+	_, err := io.ReadFull(rc, buf)
+	if err!=nil {
+		rc.Close()
+		return err
+	}
+	val := binary.BigEndian.Uint64(buf)
+	atomic.StoreInt64(&f.value, int64(val))
+	rc.Close()
+	return nil
 	// --- END your code ---
 }
 
